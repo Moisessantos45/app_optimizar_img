@@ -1,7 +1,8 @@
 import flet as ft
-from tkinter import filedialog
+from tkinter import filedialog, Tk
 from pathlib import Path
 from rembg import remove
+from PIL import Image
 import os
 
 
@@ -12,16 +13,19 @@ def mostrar_dialogo(titulo, mensaje, page: ft.Page):
     page.update()
 
 
-def optimizar_imagenes(file_path, calidad, destino):
+def optimizar_imagenes(file_path, calidad, destino, lista_procesos, page):
     Path(destino).mkdir(parents=True, exist_ok=True)
+    img = Image.open(file_path)
     nombre_archivo = os.path.basename(file_path)
     ruta_salida = Path(destino) / nombre_archivo
-    img = Image.open(file_path)
     img.save(ruta_salida, quality=calidad, optimize=True)
+    mensage = f"Optimizando {file_path} y guardando en {ruta_salida}"
+    lista_procesos.controls.append(ft.Text(mensage))
     print(f"Optimizando {file_path} y guardando en {ruta_salida}")
+    page.update()
 
 
-def remover_fondo(file_path, destino):
+def remover_fondo(file_path, destino, lista_procesos, page):
     Path(destino).mkdir(parents=True, exist_ok=True)
     nombre_archivo = os.path.basename(file_path)
     ruta_salida = Path(destino) / nombre_archivo
@@ -32,8 +36,10 @@ def remover_fondo(file_path, destino):
 
     with open(ruta_salida, "wb") as o:
         o.write(salida)
-
+    mensage = f"Removiendo fondo de {file_path} y guardando en {ruta_salida}"
+    lista_procesos.controls.append(ft.Text(mensage))
     print(f"Removiendo fondo de {file_path} y guardando en {ruta_salida}")
+    page.update()
 
 
 def main(page: ft.Page):
@@ -42,6 +48,7 @@ def main(page: ft.Page):
     is_path_destino = ""
     lista_archivos = []
     optimizar = True
+    lista_procesos = ft.Column()
 
     def seleccionar_archivo(e):
         file_picker.pick_files(
@@ -53,15 +60,22 @@ def main(page: ft.Page):
     def archivo_seleccionado_handler(e):
         nonlocal archivo_seleccionado, is_file
         if file_picker.result is not None:
+            lista_archivos.clear()
             files = file_picker.result.files
             archivo_seleccionado = True
             for file in files:
                 lista_archivos.append(file.path)
+                print("file: ", file.path)
             is_file = True
             actualizar_estado_botones()
 
     def seleccionar_carpeta_salida(e):
+        root = Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        root.update()
         folder_salida = filedialog.askdirectory(title="Selecciona la carpeta de salida")
+        root.destroy()  # Cierra la ventana de Tkinter
         nonlocal is_path_destino
         if folder_salida:
             is_path_destino = folder_salida
@@ -74,14 +88,19 @@ def main(page: ft.Page):
     def opcion_seleccionada(calidad):
         nonlocal is_file, is_path_destino, optimizar
         if optimizar:
+            lista_procesos.controls.append(ft.Text("En proceso..."))
             for file in lista_archivos:
-                optimizar_imagenes(file, calidad, is_path_destino)
+                optimizar_imagenes(file, calidad, is_path_destino, lista_procesos, page)
         else:
+            lista_procesos.controls.append(ft.Text("En proceso..."))
             for file in lista_archivos:
-                remover_fondo(file, is_path_destino)
+                remover_fondo(file, is_path_destino, lista_procesos, page)
         is_file = False
+        lista_procesos.controls.append(ft.Text("Proceso terminado"))
+        page.update()
         is_path_destino = ""
         lista_archivos.clear()
+
         mostrar_dialogo("Proceso terminado", "Proceso terminado", page)
 
     def enviar_numero(e):
@@ -91,7 +110,6 @@ def main(page: ft.Page):
         try:
             numero = int(numero_input.value)
             if 1 <= numero <= 100:
-                mostrar_dialogo("Número ingresado", f"Número ingresado: {numero}", page)
                 opcion_seleccionada(numero)
             else:
                 mostrar_dialogo(
@@ -181,6 +199,7 @@ def main(page: ft.Page):
                     alignment="center",
                     spacing=10,
                 ),
+                lista_procesos,
             ],
             horizontal_alignment="center",
             alignment="center",
